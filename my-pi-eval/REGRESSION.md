@@ -43,6 +43,8 @@ Linux/macOS 用 `.venv-harbor/bin/harbor`，并按 Shell 语法换行。每次�
 
 `capture` 只保存原会话 SHA-256、选中的 user 序号和你提供的新题面，不复制原用户内容、历史工具调用、原始轨迹或本地路径。不会自动脱敏原文，也不会自动执行历史操作。多轮故障请把必要上下文显式重构进脱敏题面和 fixture。
 
+从先前的本地回归尝试建草稿时，也可以把 `--session <session.jsonl>` 换成 `--evidence <attempt>/evidence.json`。CLI 会校验索引引用的会话文件，并把索引的 SHA-256 一起写入草稿。仍需手工提供已脱敏的 `--instruction-file`，审核 fixture 和断言后才能重跑。取消探针没有模型会话，不能用此方式建草稿。
+
 ## 复跑 Bash 故障的修复前后对照
 
 本地需要 Bash（Windows 可用 Git Bash）。`--baseline-bash pipefail-pre-fix` 加载并校验修复提交 `9a06e9d` 的父提交 `601067d` 留存的 Bash 工具快照，不要求克隆原 Git 历史。其他运行时代码、评测逻辑和用例保持一致，不切分支、不改工作区，也不等同于运行整个历史版本。
@@ -115,6 +117,7 @@ uv run python my-pi-eval/scripts/run_regression.py run `
 
 - `manifest.json`：模式、模型、重复数、用例与运行时代码指纹；`inputs/` 保存这次的用例快照，真实模型模式还冻结一份本次运行的源码。
 - `attempts/.../result.json`：硬检查、耗时、结果和证据位置。原生 `agent/` 下有 `session.jsonl`、`events.jsonl` 和 `metrics.json`；真实模型尝试还保留 Harbor 的 result 和 verifier 输出。
+- `attempts/.../evidence.json`：本地索引，记录会话、工具事件、指标、最终回答或取消探针文件的相对路径和哈希；汇总工具与自动重试事件次数，并索引验证器观察到的**用例声明产物**。它不复制原始内容、不盘点整个工作区，GitHub 工作流也不上传它。
 - `scorecard.json`：按场景记录 `pass / fail / blocked` 次数。正常结束但断言不满足是 `fail`；没有可信判定（例如容器、模型、运行器错误）是 `blocked`，不能当成模型答错，也不能从分母里静默丢掉。退出码分别是 `0 / 1 / 2`；混合结果中 `blocked` 优先提示需排查。
 
 ```powershell

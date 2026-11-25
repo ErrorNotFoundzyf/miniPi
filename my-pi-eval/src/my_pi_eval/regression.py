@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from my_pi_eval.regression_case import capture_draft, digest_files, load_case, write_json
+from my_pi_eval.regression_evidence import index_attempt, session_from_index
 from my_pi_eval.regression_run import BASH_SOURCE_PATH, HISTORICAL_BASH, SOURCE_ROOT, BashBaseline, live_preflight, prepare_task, run_live, run_offline
 from my_pi_eval.regression_verify import read_json
 
@@ -125,8 +126,15 @@ def run_suite(args: argparse.Namespace) -> int:
                 result = (run_offline(case, case_dir, script, attempt_dir, baseline) if script else
                           run_live(case, task, attempt_dir, args.harbor, args.model, environment, runtime))
                 write_json(attempt_dir / "result.json", result)
+                try:
+                    index = index_attempt(attempt_dir, scenario, repeat, result)
+                except (OSError, ValueError) as exc:
+                    index = {"version": 1, "scenario": scenario, "repeat": repeat, "status": result["status"],
+                             "index_error": type(exc).__name__}
+                write_json(attempt_dir / "evidence.json", index)
                 attempts.append({"scenario": scenario, "repeat": repeat, "status": result["status"],
-                                 "result": (attempt_dir / "result.json").relative_to(output).as_posix()})
+                                 "result": (attempt_dir / "result.json").relative_to(output).as_posix(),
+                                 "evidence": (attempt_dir / "evidence.json").relative_to(output).as_posix()})
                 write_json(output / "scorecard.json", {"manifest": manifest, "complete": False,
                                                        "attempts": attempts, "totals": summarize(attempts)})
                 print(f"{result['status']:7} {scenario} #{repeat}", flush=True)
@@ -167,7 +175,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     capture = commands.add_parser("capture", help="Start a draft from a session reference and an already sanitized prompt")
-    capture.add_argument("--session", required=True, type=Path)
+    source = capture.add_mutually_exclusive_group(required=True)
+    source.add_argument("--session", type=Path)
+    source.add_argument("--evidence", type=Path, help="Use the verified session from an earlier attempt's evidence.json")
     capture.add_argument("--user-message", default=1, type=int)
     capture.add_argument("--instruction-file", required=True, type=Path)
     capture.add_argument("--output", required=True, type=Path)
@@ -185,7 +195,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = parser.parse_args(argv)
         if args.command == "capture":
-            capture_draft(args.session, args.user_message, args.instruction_file, args.output)
+            if args.evidence and args.instruction_file.resolve() == args.evidence.resolve():
+                raise ValueError("Provide a separate, reviewed instruction file")
+            session, digest = session_from_index(args.evidence) if args.evidence else (args.session, None)
+            capture_draft(session, args.user_message, args.instruction_file, args.output, evidence_sha256=digest)
             print(f"Draft created: {args.output}. Review the fixture and checks before marking it runnable.")
             return 0
         if args.command == "run":
