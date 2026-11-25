@@ -45,8 +45,46 @@ def test_cli_runs_both_scripted_paths_and_keeps_separate_evidence(tmp_path):
         agent = result_path.parent / result["evidence"]["agent"]
         assert (agent / "session.jsonl").is_file()
         assert (agent / "events.jsonl").is_file()
+        evidence = json.loads((output / attempt["evidence"]).read_bytes())
+        assert evidence["status"] == "pass"
+        assert evidence["trace_files"]["answer.txt"]["path"] == "agent/answer.txt"
+        assert evidence["event_counts"]["tool_execution_end"] > 0
+        assert next(item for item in evidence["artifacts"] if item["path"] == "settings.txt")["matches"]
     assert (CASE_DIR / "workspace" / "settings.txt").read_bytes() == b"retries=2\n"
     assert main(args) == 2
+
+
+def test_capture_from_index_checks_fingerprint_and_copies_no_raw_trace(tmp_path):
+    from my_pi_eval.regression_evidence import index_attempt
+
+    attempt = tmp_path / "attempt"
+    logs = attempt / "agent"
+    logs.mkdir(parents=True)
+    session = logs / "session.jsonl"
+    session.write_text('{"type":"message","message":{"role":"user","content":"private prompt"}}\n', encoding="utf-8")
+    (logs / "events.jsonl").write_text('{"type":"auto_retry_start","message":"private error"}\n', encoding="utf-8")
+    record = index_attempt(attempt, "example/live", 1, {"status": "fail", "evidence": {"agent": "agent"}})
+    index = attempt / "evidence.json"
+    write_json(index, record)
+    assert record["event_counts"] == {"auto_retry_start": 1}
+    assert "private" not in index.read_text(encoding="utf-8")
+    instruction = tmp_path / "reviewed.md"
+    instruction.write_text("A reviewed replay task.", encoding="utf-8")
+    draft = tmp_path / "example-draft"
+    args = ["capture", "--evidence", str(index), "--instruction-file", str(instruction)]
+    assert main([*args, "--output", str(draft)]) == 0
+    case = json.loads((draft / "case.json").read_bytes())
+    assert case["draft"]
+    assert case["origin"]["evidence_sha256"] == hashlib.sha256(index.read_bytes()).hexdigest()
+    assert case["origin"]["session_sha256"] == hashlib.sha256(session.read_bytes()).hexdigest()
+    assert not list((draft / "workspace").iterdir())
+    assert "private" not in (draft / "instruction.md").read_text(encoding="utf-8")
+
+    session.write_text("tampered", encoding="utf-8")
+    assert main([*args, "--output", str(tmp_path / "tampered-draft")]) == 2
+    record["trace_files"]["session.jsonl"]["path"] = "../outside/session.jsonl"
+    write_json(index, record)
+    assert main([*args, "--output", str(tmp_path / "outside-draft")]) == 2
 
 
 @pytest.mark.parametrize("historical", [False, True], ids=["current", "pre-fix"])

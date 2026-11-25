@@ -34,6 +34,7 @@ class Origin(CaseModel):
     kind: Literal["synthetic", "session", "incident"]
     session_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     user_message: int | None = Field(default=None, ge=1)
+    evidence_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     reference: str | None = Field(default=None, min_length=1)
     fix_commit: str | None = Field(default=None, pattern=r"^[0-9a-f]{40}$")
 
@@ -168,7 +169,9 @@ def write_json(path: Path, payload: Any) -> None:
     temporary.replace(path)
 
 
-def capture_draft(session: Path, user_message: int, instruction: Path, destination: Path) -> None:
+def capture_draft(
+    session: Path, user_message: int, instruction: Path, destination: Path, *, evidence_sha256: str | None = None,
+) -> None:
     raw = session.read_bytes()
     users = 0
     for line in raw.splitlines():
@@ -185,7 +188,8 @@ def capture_draft(session: Path, user_message: int, instruction: Path, destinati
         raise ValueError("Provide a separate, reviewed instruction file")
     case = Case(
         version=1, id=destination.name, draft=True,
-        origin=Origin(kind="session", session_sha256=hashlib.sha256(raw).hexdigest(), user_message=user_message),
+        origin=Origin(kind="session", session_sha256=hashlib.sha256(raw).hexdigest(), user_message=user_message,
+                      evidence_sha256=evidence_sha256),
     )
     destination.mkdir(parents=True, exist_ok=False)
     (destination / "workspace").mkdir()
