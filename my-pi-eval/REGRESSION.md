@@ -101,6 +101,8 @@ uv run python my-pi-eval/scripts/run_regression.py run `
 
 ## GitHub Actions
 
+离线门禁还运行 TUI Escape 端到端测试：用确定性模型驱动真实 Python 内核启动 Bash 子进程，向真实 TUI 键处理器注入 Esc，经过 stdio JSON-RPC 检查中断结果；子进程不能写出完成标记，TUI 必须显示中断并能接受下一轮输入。这不需要 API 密钥，也不替代 Windows 手动任务的 3 秒时限检查。
+
 | 工作流 | 触发方式 | 如何使用结果 |
 | --- | --- | --- |
 | [Agent regression](../.github/workflows/regression-ci.yml) | PR、推送到 `main` | 无 API 密钥，也不启动 Docker。跑评测测试、确定性的取消测试，以及 `fresh-verification` / `bash-pipefail` 离线回放。 |
