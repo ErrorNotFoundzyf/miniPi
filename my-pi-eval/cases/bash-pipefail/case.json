@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "id": "bash-pipefail",
+  "origin": {
+    "kind": "incident",
+    "reference": "docs/coding/09-session-log-debugging-cases-会话日志排查案例.md:147 (case 3, masked exit code)",
+    "fix_commit": "9a06e9dfd14bbebf2639f9c52c731e569d4c78f9"
+  },
+  "live": true,
+  "verify_script": "upstream.py",
+  "verify_pipe_to_cat": true,
+  "verify_output_contains": ["Command failed with exit code 42", "PIPELINE_FIXTURE: upstream check failed"],
+  "live_verification_status": "failed",
+  "expected_files": {"diagnosis.txt": "upstream-exit=42\n"},
+  "preserve_files": ["upstream.py"],
+  "scripts": [
+    {
+      "id": "preserve-upstream-failure",
+      "verification_status": "failed",
+      "steps": [
+        {"tool": "verify"},
+        {"tool": "write", "args": {"path": "diagnosis.txt", "content": "upstream-exit=42\n"}}
+      ]
+    }
+  ]
+}

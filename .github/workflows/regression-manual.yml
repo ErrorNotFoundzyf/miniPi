@@ -1,0 +1,111 @@
+name: Agent regression (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Regression suite
+        type: choice
+        required: true
+        options:
+          - windows-cancellation
+          - live-pipefail
+
+permissions:
+  contents: read
+
+jobs:
+  windows-cancellation:
+    name: Windows Bash cancellation
+    if: inputs.suite == 'windows-cancellation'
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.9.29'
+          python-version: '3.12'
+          enable-cache: false
+      - name: Install locked dependencies
+        run: uv sync --locked
+      - name: Measure cancellation three times
+        shell: bash
+        run: |
+          bash_path="$(cygpath -m "${BASH%.exe}.exe")"
+          test -f "$bash_path"
+          PI_BASH_PATH="$bash_path" uv run --no-sync python my-pi-eval/scripts/run_regression.py run \
+            --case my-pi-eval/cases/bash-cancellation --trials 3 \
+            --output .my_agent_core/ci-windows
+      - name: Upload cancellation report
+        if: '!cancelled()'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-cancellation
+          path: |
+            .my_agent_core/ci-windows/manifest.json
+            .my_agent_core/ci-windows/scorecard.json
+            .my_agent_core/ci-windows/attempts/bash-cancellation/interrupt-active-child/*/result.json
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
+
+  live-pipefail:
+    name: DeepSeek Flash Bash comparison
+    if: inputs.suite == 'live-pipefail' && github.ref_type == 'branch' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-24.04
+    environment: regression-live
+    timeout-minutes: 40
+    env:
+      HARBOR_TELEMETRY: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: '0.9.29'
+          python-version: '3.12'
+          enable-cache: false
+      - name: Install locked runtime and separate Harbor environment
+        run: |
+          uv sync --locked
+          uv venv --python 3.12 "$RUNNER_TEMP/harbor"
+          uv pip install --python "$RUNNER_TEMP/harbor/bin/python" ./my-pi-eval
+      - name: Run both live arms
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [[ -z "$DEEPSEEK_API_KEY" ]]; then
+            echo "::error::Set DEEPSEEK_API_KEY in the regression-live GitHub environment."
+            exit 2
+          fi
+          runner=my-pi-eval/scripts/run_regression.py
+          output=.my_agent_core/ci-live
+          common=(--mode live --model deepseek/deepseek-flash --trials 3
+                  --case my-pi-eval/cases/bash-pipefail --harbor "$RUNNER_TEMP/harbor/bin/harbor")
+          before=0
+          uv run --no-sync python "$runner" run "${common[@]}" \
+            --baseline-bash pipefail-pre-fix --output "$output/before" || before=$?
+          after=0
+          uv run --no-sync python "$runner" run "${common[@]}" --output "$output/after" || after=$?
+          if (( before > 1 || after > 1 )); then
+            echo "::error::At least one arm is blocked (before=$before, after=$after)."
+            exit 2
+          fi
+          uv run --no-sync python "$runner" compare "$output/before/scorecard.json" "$output/after/scorecard.json"
+      - name: Upload live scorecards
+        if: '!cancelled()'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: live-pipefail
+          path: |
+            .my_agent_core/ci-live/*/manifest.json
+            .my_agent_core/ci-live/*/scorecard.json
+            .my_agent_core/ci-live/*/attempts/bash-pipefail/live/*/result.json
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
+

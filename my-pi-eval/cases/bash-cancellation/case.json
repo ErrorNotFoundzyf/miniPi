@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "id": "bash-cancellation",
+  "origin": {
+    "kind": "incident",
+    "reference": "docs/coding/09-session-log-debugging-cases-会话日志排查案例.md:151 (case 3, delayed interruption)",
+    "fix_commit": "9a06e9dfd14bbebf2639f9c52c731e569d4c78f9"
+  },
+  "timeout_sec": 25,
+  "verify_script": "long_running.py",
+  "preserve_files": ["long_running.py"],
+  "scripts": [
+    {
+      "id": "interrupt-active-child",
+      "cancel_within_ms": 3000,
+      "steps": [{"tool": "verify"}]
+    }
+  ]
+}

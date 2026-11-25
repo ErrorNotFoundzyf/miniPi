@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "id": "fresh-verification",
+  "origin": {"kind": "synthetic"},
+  "live": true,
+  "verify_script": "check.py",
+  "expected_files": {"settings.txt": "retries=3\n"},
+  "preserve_files": ["check.py"],
+  "checkpoint_files": ["settings.txt"],
+  "scripts": [
+    {
+      "id": "stale-after-write",
+      "verification_status": "stale",
+      "steps": [
+        {"tool": "verify"},
+        {"tool": "write", "args": {"path": "settings.txt", "content": "retries=3\n"}}
+      ]
+    },
+    {
+      "id": "fresh-after-recheck",
+      "verification_status": "passed",
+      "steps": [
+        {"tool": "verify"},
+        {"tool": "edit", "args": {"path": "settings.txt", "edits": [{"oldText": "retries=2", "newText": "retries=3"}]}},
+        {"tool": "verify"}
+      ]
+    }
+  ]
+}
