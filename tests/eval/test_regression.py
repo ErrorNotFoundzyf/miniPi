@@ -129,6 +129,19 @@ def test_cancellation_uses_observed_outcomes_not_just_tool_message(tmp_path, ove
     assert verify(workspace, tmp_path, oracle)["status"] == expected
 
 
+def test_timeout_baseline_loses_only_the_diagnostic(tmp_path):
+    case_dir = CASES_DIR / "bash-timeout-output"
+    case, _ = load_case(case_dir)
+    historical = BashBaseline.load("timeout-output-pre-fix")
+    result = run_offline(case, case_dir, case.scripts[0], tmp_path / "historical-timeout", baseline=historical)
+    assert result["status"] == "fail"
+    assert [check for check in result["checks"] if not check["passed"]] == [{
+        "check": "verification_output_contains",
+        "expected": "TRACE_TIMEOUT: diagnostic before stall",
+        "passed": False,
+    }]
+
+
 def test_cancellation_rejects_a_preexisting_marker(tmp_path):
     case_dir = tmp_path / "bash-cancellation"
     shutil.copytree(CASES_DIR / case_dir.name, case_dir)
