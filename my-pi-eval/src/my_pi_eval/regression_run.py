@@ -29,6 +29,10 @@ HISTORICAL_BASH = {
         "601067d60fc510f4a0739894cbf4aeb664cc2e47",
         "a7a8f4d26715402c73c5fd82226b12f5b68d399e386419e83ae15c432df4b6f3",
     ),
+    "timeout-output-pre-fix": (
+        "a867a9854fc8e41823658784494aa0c2627aed05",
+        "16047f16eabf75b7b4d71510d0744de3244410120736f543be96b6a48dff4ce3",
+    ),
 }
 PROVIDER_KEYS = {"deepseek": "DEEPSEEK_API_KEY", "openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
 TASK_DOCKERFILE = """FROM python:3.12-slim-bookworm
@@ -114,7 +118,8 @@ async def execute_script(
             call = None
             if index < len(script.steps):
                 step = script.steps[index]
-                name, args = ("bash", {"command": command, "timeout": 15}) if step.tool == "verify" else (step.tool, step.args)
+                name, args = (("bash", {"command": command, "timeout": case.verify_timeout_sec})
+                              if step.tool == "verify" else (step.tool, step.args))
                 call = ToolCall(id=f"regression-{index + 1}", name=name, args=args)
             message = Message(
                 role="assistant", content="" if call else "Scripted run finished.",

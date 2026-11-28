@@ -67,6 +67,7 @@ class Case(CaseModel):
     timeout_sec: int = Field(default=90, ge=5, le=600)
     verify_script: str | None = None
     verify_pipe_to_cat: bool = False
+    verify_timeout_sec: int = Field(default=15, ge=1, le=60)
     verify_output_contains: list[str] = Field(default_factory=list)
     live_verification_status: Literal["passed", "failed"] = "passed"
     expected_files: dict[str, str] = Field(default_factory=dict)

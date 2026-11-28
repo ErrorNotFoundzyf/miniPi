@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "id": "bash-timeout-output",
+  "origin": {
+    "kind": "synthetic",
+    "reference": "Sanitized minimal reproduction of Bash losing diagnostics on timeout; see REGRESSION.md."
+  },
+  "verify_script": "check.py",
+  "verify_timeout_sec": 3,
+  "verify_output_contains": ["Command timed out after 3 seconds", "TRACE_TIMEOUT: diagnostic before stall"],
+  "expected_files": {"verification.txt": "attempted\n"},
+  "preserve_files": ["check.py"],
+  "scripts": [
+    {
+      "id": "retain-output",
+      "verification_status": "failed",
+      "steps": [
+        {"tool": "verify"},
+        {"tool": "write", "args": {"path": "verification.txt", "content": "attempted\n"}}
+      ]
+    }
+  ]
+}

@@ -99,6 +99,10 @@ uv run python my-pi-eval/scripts/run_regression.py run `
 
 当前实现只请求一次终止，在 Windows 将 `taskkill` 放到工作线程，工具仍须等子进程退出、输出管道关闭才返回中断。Windows + Git Bash 复测 **5/5**，中断返回耗时约 **0.84–1.21 秒**，没有自然完成标记。3 秒门槛不变，五次结果不是对所有机器的延迟保证。证据保存于 `agent/cancellation.json`。
 
+## Bash 超时输出回归
+
+`bash-timeout-output` 是从本地真实会话提炼的公开最小用例，不含原会话指纹、文本或命令。固定脚本先打印诊断，再触发三秒超时。验证器要求同一次 Bash 调用既返回超时失败，也保留此前的诊断；仅写对回执不会通过。PR 检查验证历史基线 `timeout-output-pre-fix` 因缺诊断而失败，并在当前版离线回放中要求通过。它不检查 Windows 管道资源清理；本地对照中观察到的清理警告不属于本用例的通过条件。
+
 ## GitHub Actions
 
 离线门禁还运行 TUI Escape 端到端测试：用确定性模型驱动真实 Python 内核启动 Bash 子进程，向真实 TUI 键处理器注入 Esc，经过 stdio JSON-RPC 检查中断结果；子进程不能写出完成标记，TUI 必须显示中断并能接受下一轮输入。这不需要 API 密钥，也不替代 Windows 手动任务的 3 秒时限检查。
